@@ -1,0 +1,393 @@
+#!/bin/bash
+
+#########################################################################
+# James Hippler
+# Oregon State University
+# Computer Science
+# CS 344-400 (Spring 2018)
+# Operating Systems I
+#
+# Program 1 - Matrices
+# Due: Monday, April 23, 2018
+#
+# Filename: matrix (BASH)
+#
+# Objectives:
+# This Assigment asks you to write bash shell scripts to compute
+# matrix operations.  The purpose is to get you familiar with the
+# Unix shell, shell programming, Unix utilities, standard input,
+# output, and error, pipelines, process ids, exit values, and
+# signals (at a basic level)
+#########################################################################
+
+#########################################################################
+# Description: dims function
+# Should print the dimensions of the matrix as the number of rows,
+# followed by a space, then the number of columns.
+#
+# matrix dims [MATRIX]
+# Prints error message to stderr, nothing to stdout and return value != 0 if:
+# 	Argument count is greater than 1 (e.g. `matrix dims m1 m2`).
+# 	Argument count is 1 but the file named by argument 1 is not readable
+# 	(e.g. `matrix dims no_such_file`).
+# Otherwise, prints "ROWS COLS" (Space separated!) to stdout, nothing to stderr,
+# and returns 0.
+#########################################################################
+
+dims(){
+	rows=0																																				# Establish a variable to count and store the number of rows (Initialize to zero)
+	cols=0																																				# Establish a variable to count and store the number of columns (Initialize to zero)
+	TMPDims="temp_dims_$$"																												# Create a temporary file that will be used later in the function
+	while read myLines; do																												# While reading through each line in the file
+		(( rows ++ ))																																# Increment the number of rows by one
+	done < $1																																			# Finished once end of file is reached
+	firstline=$(head -n 1 $1)																											# Capture the first line of the matrix and assign to variable
+	for i in $firstline; do																												# Walk through each integer of the first line
+		(( cols ++ ))																																# Increment the column value for each integer in the firstline
+	done																																					# Finished once the end of the line is reached
+	echo "$rows $cols" > $TMPDims																									# Store the row and columns value in a temporary file
+}
+
+#########################################################################
+# Description: transpose function
+# Should reflect the elements of the matrix along the main diagonal.
+# Thus, an MxN matrix will become an NxM matrix and the values along
+# the main diagonal will remain unchanged.
+#
+# matrix transpose [MATRIX]
+# Prints error message to stderr, nothing to stdout and return value != 0 if:
+# 	Argument count is greater than 1 (e.g. `matrix transpose m1 m2`).
+# 	Argument count is 1 but the file named by argument 1 is not readable
+# 	(e.g. `matrix transpose no_such_file`).
+# Otherwise, prints the transpose of the input, in a valid matrix format
+# to stdout, nothing to stderr, and returns 0.
+#########################################################################
+
+transpose(){
+
+	TMPTrans="temp_transpose_$$"																									# Create a temporary file that will be used later in the function
+	TMPTransFinal="temp_transpose_final_$$"																				# Create a temporary file that will be used later in the function to store the final transpose
+
+	dims "$1"																																			# Call the dims function to get the size of the matrix
+
+	count=1																																				# Reassign counter variable to 1 for upcoming while loop
+  while [ $count -le $cols ]; do																								# While the counter variable is less than or equal to cols from dims
+		tempTrans=$(cut -f "$count" < $1)																						# Grab the current column from the m1 matrix and store to variable
+		echo "$tempTrans" > $TMPTrans																								# Write variable to a temporary tranpose file
+		tempTrans=$(tr '\n' '\t' < $TMPTrans)																				# Change the break lines to tabs and store in a temp variable
+		echo "$tempTrans" > $TMPTrans																								# Print temp variable to temporary transpose file
+		tempTrans=$(cut -f 1-$rows $TMPTrans)																				# Remove the trailing tab at the end of each row and store in a temp variable
+		echo "$tempTrans" > $TMPTrans																								# Print temp variable to temporary transpose file
+		cat $TMPTrans >> $TMPTransFinal																							# Append the column to the final file version before deleting and restarting
+		(( count ++ ))																															# Increment the counter variable to progress through the while loop
+  done																																					# Exit while loop and terminate function.
+}
+
+#########################################################################
+# Description: mean function
+# Should take an MxN matrix and return an 1xN row vector, where the
+# first element is the mean of column one, the second element is the
+# mean of column two, and so on.
+#
+# matrix mean [MATRIX]
+# Prints error message to stderr, nothing to stdout and return value != 0 if:
+#	 	Argument count is greater than 1 (e.g. `matrix mean m1 m2`).
+# 	Argument count is 1 but the file named by argument 1 is not readable
+# 	(e.g. `matrix mean no_such_file`).
+# Otherwise, prints a row vector mean of the input matrix, in a valid matrix
+# format to stdout, nothing to stderr, and returns 0. All values must round
+# to the nearest integer, with ***.5 values rounded away from zero.
+#########################################################################
+
+mean(){
+	TMPMean="temp_mean_$$"																												# Create a temporary file that will be used later in the function
+
+	transpose "$file"																															# Call the transpose function to flip the matrix before finding the mean
+
+	count=0																																				# Establish a counter variable that will be used in a while loop
+	while read myLines; do																												# While reading through each line in the file of the transposed matrix
+		sum=0																																				# Create a sum variable and Initialize to zero
+		for count in $myLines; do																										# Walk through each element in each row of the matrix
+			sum=`expr $sum + $count`																									# Take the integer in each element and add it to the total sum
+		done																																				# Finish finding the sum for each row
+		mean=$((($sum + ($rows / 2) * (($sum > 0) * 2 - 1)) / $rows))								# Get the mean for each row (borrowed from homework instructions)
+		echo "$mean" >> $TMPMean																										# Append the row's sum to the TMP file
+	done < $TMPTransFinal																													# Finish navigating through every row in the matrix (generated in Transpose)
+	temphold=$(tr '\n' '\t' < $TMPMean)																						# Change the break lines to tabs and store in a temp variable
+	echo "$temphold" > $TMPMean																										# Print temp variable to temporary transpose file
+	temphold=$(cut -f 1-$cols $TMPMean)																						# Remove the trailing tab at the end of each row and store in a temp variable
+	echo "$temphold" > $TMPMean																										# Print temp variable to temporary transpose file
+}
+
+#########################################################################
+# Description: add function
+# Should take two MxN matrices and add them together element-wise to
+# produce an MxN matrix. add should return an error if the matrices do
+# not have the same dimensions.
+#
+# matrix add MATRIX_LEFT MATRIX_RIGHT
+# Prints error message to stderr, nothing to stdout and return value != 0 if:
+# 	Argument count does not equal 2 (e.g. `matrix add m1 m2 m3` or
+# 	`matrix add m1`).
+# 	Argument count is 2 but the file named by either argument is not readable
+# 	(e.g. `matrix add m1 no_such_file`).
+# The dimensions of the input matrices do not allow them to be added together
+# following the rules of matrix addition.
+# Otherwise, prints the sum of both matricies, in a valid matrix format
+# to stdout, nothing to stderr, and returns 0.
+#
+# I made this function way uglier than it probably should have been
+#########################################################################
+
+add(){
+	TMPColsM1="temp_add_colsM1_$$"																								# Create a temporary file that will store the columns from M1
+	TMPColsM2="temp_add_colsM2_$$"																								# Create a temporary file that will store the columns from M2
+	TMPAdd="temp_add_$$"																													# Create a temporary file that will be used to store add calculations
+	TMPAddFinal="temp_add_final_$$"																								# Create a temporary file that store the final addition matrix
+
+	colCount=1																																		# Create a counter variable for the outer while loop
+	while [ $colCount -le $m1Cols ]; do																						# Start a while loop that will process through all columns
+		m1ColCut=$(cut -f $colCount $1)																							# Cut the current column from matrix 1 and store to variable
+		m2ColCut=$(cut -f $colCount $2)																							# Cut the current column from matrix 2 and store to variable
+		echo "$m1ColCut" > $TMPColsM1																								# Place the store variable from m1 into the m1 columns file
+		echo "$m2ColCut" > $TMPColsM2																								# Place the store variable from m2 into the m2 columns file
+		m1ColCut=$(tr '\n' '\t' < $TMPColsM1)																				# Change the break lines to tabs and store in a temp variable
+		m2ColCut=$(tr '\n' '\t' < $TMPColsM2)																				# Change the break lines to tabs and store in a temp variable
+		echo "$m1ColCut" > $TMPColsM1																								# Print temp variable to temporary transpose file
+		echo "$m2ColCut" > $TMPColsM2																								# Print temp variable to temporary transpose file
+
+		rowCount=1																																	# Create a counter variable for the inner while loop
+		while [[ $rowCount -le $m1Rows ]]; do																				# Start a while loop that will process through all rows
+			sum=0																																			# Create a variable for sum and Initialize to zero
+			m1Element=$(cut -f $rowCount $TMPColsM1)																	# Cut the current column from matrix 1 and store to variable
+			m2Element=$(cut -f $rowCount $TMPColsM2)																	# Cut the current column from matrix 1 and store to variable
+			sum=`expr $m1Element + $m2Element`																				# Add the element from matrix 1 with matrix 2 and assign to sum
+			echo "$sum" >> $TMPAdd																										# Add sum to the temporary addition file.
+			(( rowCount ++ ))																													# Increment the row counter variable to process the next row
+		done
+		rowhold=$(tr '\n' '\t' < $TMPAdd)																						# Change the break lines to tabs in the temporary file and store in variable
+		rm -f $TMPAdd																																# Remove the temporary file to reset
+		echo "$rowhold" >> $TMPAddFinal																							# Store the variable in the final version of the file
+		(( colCount ++ ))																														# Increment the column counter variable to process next column
+	done
+	transpose "$TMPAddFinal"																											# Call the tranpose function to flip the matrix to the correct pattern
+	cat $TMPTransFinal > $TMPAddFinal																							# Cat the output from transpose to a temp file for add (probably didn't need to do this)
+}
+
+#########################################################################
+# Description: main function
+# Should take an MxN and NxP matrix and produce an MxP matrix.
+# Note that, unlike addition, matrix multiplication is not commutative.
+# That is A*B != B*A.
+#
+# matrix multiply MATRIX_LEFT MATRIX_RIGHT
+# Prints error message to stderr, nothing to stdout and return value != 0 if:
+# 	Argument count does not equal 2 (e.g. `matrix multiply m1 m2 m3` or
+# 	`matrix multiply m1`).
+# 	Argument count is 2 but the file named by either argument is not
+# 	readable (e.g. `matrix multiply m1 no_such_file`).
+# 	The dimensions of the input matrices do not allow them to be multiplied
+# 	together following the rules of matrix multiplication.
+# Otherwise, prints the product of both matricies, with the first argument
+# as the left matrix and the second argumentas the right matrix, in a valid
+# matrix format to stdout, nothing to stderr, and returns 0. (`matrix multiply
+# A B` should return A*B, not B*A)
+#########################################################################
+
+multiply(){
+	TMPColsM1="temp_multiply_colsM1_$$"																						# Create a temporary file that will store the columns from M1
+	TMPColsM2="temp_multiply_colsM2_$$"																						# Create a temporary file that will store the columns from M2
+	TMPMulti="temp_multiply_$$"																										# Create a temporary file that will be used to store add calculations
+	TMPMultiFinal="temp_multiply_final_$$"																				# Create a temporary file that store the final addition matrix
+
+	transpose "$1"																																# Transpose the first matrix so that it's rows match the columns of the second (this will make the upcoming loop easier)
+
+	outterRowCount=1																															# Create a counter variable to work through the Rows of matix m1
+	while [ $outterRowCount -le $m1Rows ]; do																			# Creates loop that works through each row of Matrix 1
+		m1ColCut=$(cut -f $outterRowCount $TMPTransFinal)														# Cut the current row from matrix 1 (transposed) and store to variable
+		echo "$m1ColCut" > $TMPColsM1																								# Place the stored variable from m1 into the m1 columns file (techinically they're rows)
+		m1ColCut=$(tr '\n' '\t' < $TMPColsM1)																				# Change the break lines to tabs and store in a temp variable
+		echo "$m1ColCut" > $TMPColsM1																								# Print temp variable to temporary transpose file
+		colCount=1																																	# Establish a counter variable for traversing rows and initailize to 1
+		while [ $colCount -le $m2Cols ]; do																					# Creates a loop that works though each Column from matrix 2
+			m2ColCut=$(cut -f $colCount $2)																						# Cut the current column from matrix 2 and store to variable
+			echo "$m2ColCut" > $TMPColsM2																							# Place the store variable from m2 into the m2 columns file
+			m2ColCut=$(tr '\n' '\t' < $TMPColsM2)																			# Change the break lines to tabs and store in a temp variable
+			echo "$m2ColCut" > $TMPColsM2																							# Print temp variable to temporary columns file
+			sum=0																																			# Create a variable that to manage the sum for each matrix multiplication
+			innerColCount=1																														# Create a counter variable the traverse columns in matrix 2 and initialize to 1
+			while [ $innerColCount -le $m1Cols ]; do																	# Create final innner loop to navigate through each element in current m1 row and m2 column
+				m1Element=$(cut -f $innerColCount $TMPColsM1)														# Capture the current element from the current column from matrix 1 and store to variable
+				m2Element=$(cut -f $innerColCount $TMPColsM2)														# Capture the current element from the current column from matrix 2 and store to variable
+				sum=$(($m1Element * $m2Element + $sum))																	# Multiply the m1 element eith m2 element and add to sum
+				(( innerColCount ++ ))																									# Increment to the next element from m1 and m2
+			done
+			echo "$sum" >> $TMPMulti																									# Add the Sum to a temporary file
+			(( colCount ++ ))																													# and move to the next column in m2
+		done
+		temphold=$(tr '\n' '\t' < $TMPMulti)																				# Change the break lines to tabs and store in a temp variable
+		echo "$temphold" >> $TMPMultiFinal																					# Print temp variable to temporary transpose file
+		rm -f $TMPMulti																															# Remove the temporary file, (it'll be recreated with the new sum row)
+		(( outterRowCount ++ ))																											# Increment the counter variable to move to the next m1 row
+	done
+	temphold=$(cut -f 1-$m2Cols $TMPMultiFinal)																		# Remove the trailing tab at the end of each row and store in a temp variable
+	echo "$temphold" > $TMPMultiFinal																							# past the final product into the final Multiply file.
+}
+
+#########################################################################
+# Description: verifyArguments function
+# Verify user input the correct number of arguments depending on
+# which function they are invoking.  Also verifies that the file names
+# are valid and can be opened/read.  Returns error messages to stderr
+# and exits with a value of 1 if the arguments are not input correctly.
+#########################################################################
+
+verifyArguments(){
+	TMPStdin="temp_stdinmatrix_$$"
+	if [ -z "$1" ]; then																													# If the user did not provide ANY operations then
+		echo "No Operation provided. Unable to proceed with execution!" >&2					# Output error message to stderr
+		houseKeeping																																# Call clean up function to remove tempfiles
+		exit 1																																			# Exit the program with a value of 1
+
+	elif [ $1 == "dims" ] || [ $1 == "transpose" ] || [ $1 == "mean" ]; then			# If user selects the function is dims, transpose, or mean then
+		if (( $# > 2 )); then																												# If there are more than two arguments provided
+			echo "Invalid number of arguments provided for $1 operation" >&2					# Output error message to stderr instead of stdout
+			houseKeeping																															# Call clean up function to remove tempfiles
+			exit 1																																		# Exit the program with a value of 1
+		fi
+		if (( $# == 2 )); then																											# If the number of arguments is equal to 2 then
+			file="$2"																																	# Set the input file to a variable called file (makes calling the functions easier laters)
+		fi
+		if (( $# < 2)); then																												# If there are less than two arguments provided on the command line
+			if [ -p "/dev/stdin" ] || [ -s "/dev/stdin" ]; then												# If data was piped into stdin file or stdin exists and is not empty
+				cat "/dev/stdin" > $TMPStdin																						# Then cat stdin into a temporary file
+				file=$TMPStdin																													# and assign the temporary file to the file variables
+			else																																			# Otherwise
+				echo "No filename provided for $1 argument." >&2												# Output an error message to stderr
+				houseKeeping																														# Call clean up function to remove tempfiles
+				exit 1																																	# Exit the program with a value 1
+			fi
+		fi
+		if [[ ! -r "$file" ]]; then																									# If the input file cannot be found or read then
+			echo "Invalid filename.  Unable to read file $file" >&2										# Output error message to stderr instead of stdout
+			houseKeeping																															# Call clean up function to remove tempfiles
+			exit 1																																		# Exit the program with a value of 1
+		fi
+		"$1" "$file"																																# If everything works great then all the function and send the file
+
+	elif [ $1 == "add" ] || [ $1 == "multiply" ]; then														# If user selects the functions add or multiply then
+		if [ "$#" -ne 3 ]; then																											# If there are not three arguments provided (operation and two files)
+			echo "Invalid number of arguments provided for $1 operation" >&2					# Output error message to stderr instead of stdout
+			houseKeeping																															# Call clean up function to remove tempfiles
+			exit 1																																		# Exit the program with a value of 1
+		fi
+		if [ ! -f "$2" ]; then																											# If the first file cannot be opened or read for any reason
+			echo "Invalid filename.  Unable to read file $2" >&2											# Output error message to stderr instead of stdout
+			houseKeeping																															# Call clean up function to remove tempfiles
+			exit 1																																		# Exit the program with a value of 1
+		fi
+		if [ ! -f "$3" ]; then																											# If the second file cannot be opened or read for any reason
+			echo "Invalid filename.  Unable to read file $3" >&2											# Output error message to stderr instead of stdout
+			houseKeeping																															# Call clean up function to remove tempfiles
+			exit 1																																		# Exit the program with a value of 1
+		fi
+		verifyDimensions "${@:1}"																										# Calls a function confirm that the matrix dimensions for m1 and m2 are compatible
+		"$1" "${@:2}"																																# If they are, then call the multiply or add function and send the matrix files
+	else																																					# If an operation IS provided but not valid
+		echo "Requested operation $1 is not valid" >&2															# Output error message to stderr instead of stdout
+		houseKeeping																																# Call clean up function to remove tempfiles
+		exit 1																																			# Exit the program with a value of 1
+	fi
+}
+
+#########################################################################
+# Description: verifyDimensions function
+# Function confirms that the dimensions are equivalent for both file
+# submissions.  If they are not equal then add or multiply are not
+# possible, so the function exits the program.  Otherwise the
+# appropriate mathematical function is called.
+#########################################################################
+
+verifyDimensions(){
+	dims "$2"																																			# Call dims function and send the first matrix
+	m1Rows="$rows"																																# Capture the rows for the first matrix
+	m1Cols="$cols"																																# Capture the cols for the first matrix
+	dims "$3"																																			# Call dims function and send the second matrix
+	m2Rows="$rows"																																# Capture the rows for the second matrix
+	m2Cols="$cols"																																# Capture the rows for the second matrix
+
+	if [ $1 == "add" ]; then																											# If the operation is add then
+		if [ $m1Rows -ne $m2Rows ] || [ $m1Cols -ne $m2Cols ]; then									# Confirm that the rows and columns are equivalent
+			echo "Matrix Dimensions are not correct.  Unable to compare!" >&2					# If not, output and error message to the console (stderr)
+			houseKeeping																															# Call houseKeeping function to clean up existing temp files
+			exit 1																																		# Exit the program with a value of 1
+		fi
+	fi
+	if [ $1 == "multiply" ]; then																									# If the operation is multiply then
+		if [ $m1Cols -ne $m2Rows ]; then																						# Confirm the columns from m1 are equivalent to the rows from m2
+			echo "Matrix Dimensios are not equivalent.  Unable to compare!" >&2				# If not, output and error message to the console (stderr)
+			houseKeeping																															# Call houseKeeping function to clean up existing temp files
+			exit 1																																		# Exit the program with a value of 1
+		fi
+	fi
+}
+
+#########################################################################
+# Description: printResults function
+# Outputs the final results depending on which operation was selected.
+# Probably should have made this part of each individual function, but
+# it was making things tricky when I called separate functions to
+# complete certain operations
+#########################################################################
+
+printResults(){
+	if [ $1 == "dims" ]; then																											# If the first argument is "dims"
+		cat $TMPDims																																# Output the row and column values (separated by space) to the console
+	fi
+	if [ $1 == "transpose" ]; then																								# If the first argument is "tranpose"
+		cat $TMPTransFinal																													# Output the results from the tranpose function to the console
+	fi
+	if [[ $1 == "mean" ]]; then																										# If the first argument is "mean"
+		cat $TMPMean																																# Output the result from the mean function to the console
+	fi
+	if [[ $1 == "add" ]]; then																										# If the first argument is "add"
+		cat $TMPAddFinal																														# Output the results from the add function to the console
+	fi
+	if [[ $1 == "multiply" ]]; then																								# If the first argument is "multiply"
+		cat $TMPMultiFinal																													# Output the results from the multiply function to the console
+	fi
+}
+
+#########################################################################
+# Description: cleanUp function
+# Function performs garbage collection and removes any leftover
+# temporary files stored in the current working directory.
+#########################################################################
+
+houseKeeping(){
+	rm -f $TMPStdin																																# Force remove the file temp_stdinmatrix_<PID>
+	rm -f $TMPDims																																# Force remove the file temp_dims_<PID>
+	rm -f $TMPTrans																																# Force remove the file temp_transpose_<PID>
+	rm -f $TMPTransFinal																													# Force remove the file temp_transpose_final_<PID>
+	rm -f $TMPMean																																# Force remove the file temp_mean_<PID>
+	rm -f $TMPColsM1																															# Force remove the file temp_add_colsM1_<PID>
+	rm -f $TMPColsM2																															# Force remove the file temp_add_colsM2_<PID>
+	rm -f $TMPAdd																																	# Force remove the file temp_add_<PID>
+	rm -f $TMPAddFinal																														# Force remove the file temp_add_final_<PID>
+	rm -f $TMPMulti																																# Force remove the file temp_multiply_<PID>
+	rm -f $TMPMultiFinal																													# Force remove the file temp_multiply_final_<PID>
+}
+
+#########################################################################
+# Description: main function
+# Program starts here and calls functions as necessary
+# Calls the mergesort function that completes most of the program's
+# functionality.
+#########################################################################
+
+# Trap signal to catch SIGINT and cleanup tmp files before exiting the program
+trap "rm -f temp_**_$$; echo; echo 'CTRL+C received, exiting'; exit 1" INT HUP TERM
+verifyArguments "${@:1}"																												# Call function to verify user inputs.  Send user inputs
+printResults "$1"																																# Call function to output the temporary file created by the selected operation
+houseKeeping																																		# Run clean up and trash any tempfiles
+exit 0																																					# Terminate the program normally (everything went as expected.....PRAISE BE!)
